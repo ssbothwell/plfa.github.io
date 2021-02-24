@@ -16,10 +16,15 @@ the next step is to define relations, such as _less than or equal_.
 ## Imports
 
 ```
+open import Function using (_$_)
+import plfa.part1.Induction
+open plfa.part1.Induction using (Bin; ⟨⟩; _I; _O; inc; from; to)
 import Relation.Binary.PropositionalEquality as Eq
-open Eq using (_≡_; refl; cong)
-open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Nat.Properties using (+-comm; +-identityʳ)
+import Relation.Binary.PropositionalEquality as Eq
+open Eq using (_≡_; refl; cong; sym)
+open Eq.≡-Reasoning
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
+open import Data.Nat.Properties using (*-comm; +-comm; +-identityʳ)
 ```
 
 
@@ -245,15 +250,11 @@ partial order but not a total order.
 
 Give an example of a preorder that is not a partial order.
 
-```
--- Your code goes here
-```
+- Integers under division
 
 Give an example of a partial order that is not a total order.
 
-```
--- Your code goes here
-```
+- Naturals under division
 
 ## Reflexivity
 
@@ -288,8 +289,8 @@ hold, then `m ≤ p` holds.  Again, `m`, `n`, and `p` are implicit:
   → n ≤ p
     -----
   → m ≤ p
-≤-trans z≤n       _          =  z≤n
-≤-trans (s≤s m≤n) (s≤s n≤p)  =  s≤s (≤-trans m≤n n≤p)
+≤-trans z≤n _ = z≤n
+≤-trans (s≤s p1) (s≤s p2) = s≤s (≤-trans p1 p2)
 ```
 Here the proof is by induction on the _evidence_ that `m ≤ n`.  In the
 base case, the first inequality holds by `z≤n` and must show `zero ≤ p`,
@@ -365,7 +366,7 @@ The above proof omits cases where one argument is `z≤n` and one
 argument is `s≤s`.  Why is it ok to omit them?
 
 ```
--- Your code goes here
+-- m and n would trivially be different values in that case?
 ```
 
 
@@ -505,10 +506,7 @@ The proof is straightforward using the techniques we have learned, and is best
 broken into three parts. First, we deal with the special case of showing
 addition is monotonic on the right:
 ```
-+-monoʳ-≤ : ∀ (n p q : ℕ)
-  → p ≤ q
-    -------------
-  → n + p ≤ n + q
++-monoʳ-≤ : ∀ (n p q : ℕ) → p ≤ q → n + p ≤ n + q
 +-monoʳ-≤ zero    p q p≤q  =  p≤q
 +-monoʳ-≤ (suc n) p q p≤q  =  s≤s (+-monoʳ-≤ n p q p≤q)
 ```
@@ -538,11 +536,7 @@ Rewriting by `+-comm m p` and `+-comm n p` converts `m + p ≤ n + p` into
 
 Third, we combine the two previous results:
 ```
-+-mono-≤ : ∀ (m n p q : ℕ)
-  → m ≤ n
-  → p ≤ q
-    -------------
-  → m + p ≤ n + q
++-mono-≤ : ∀ (m n p q : ℕ) → m ≤ n → p ≤ q → m + p ≤ n + q
 +-mono-≤ m n p q m≤n p≤q  =  ≤-trans (+-monoˡ-≤ m n p m≤n) (+-monoʳ-≤ n p q p≤q)
 ```
 Invoking `+-monoˡ-≤ m n p m≤n` proves `m + p ≤ n + p` and invoking
@@ -555,9 +549,19 @@ transitivity proves `m + p ≤ n + q`, as was to be shown.
 Show that multiplication is monotonic with regard to inequality.
 
 ```
--- Your code goes here
-```
+*-monoʳ-≤ : ∀ (n p q : ℕ) → p ≤ q → n * p ≤ n * q
+*-monoʳ-≤ zero p q p≤q = z≤n
+*-monoʳ-≤ (suc n) p q p≤q = +-mono-≤ p q (n * p) (n * q) p≤q (*-monoʳ-≤ n p q p≤q)
 
+*-monoˡ-≤ : ∀ (n p q : ℕ) → n ≤ p → n * q ≤ p * q
+*-monoˡ-≤ n p q n≤p  rewrite *-comm n q | *-comm p q = *-monoʳ-≤ q n p n≤p
+
+*-mono-≤ : ∀ (m n p q : ℕ) → m ≤ n → p ≤ q → m * p ≤ n * q
+*-mono-≤ m n p q m≤n p≤q =
+  let p1 = *-monoˡ-≤ m n p m≤n
+      p2 = *-monoʳ-≤ n p q p≤q
+  in ≤-trans p1 p2
+```
 
 ## Strict inequality {name=strict-inequality}
 
@@ -602,8 +606,12 @@ exploiting the corresponding properties of inequality.
 Show that strict inequality is transitive.
 
 ```
--- Your code goes here
+<-trans : ∀ {m n p : ℕ} → m < n → n < p → m < p
+<-trans z<s (s<s n<p) = z<s
+<-trans (s<s m<n) (s<s n<p) = s<s (<-trans m<n n<p)
 ```
+<-trans zero (suc n) (suc p) m<n n<p = z<s
+<-trans (suc m) (suc n) (suc p) (s<s m<n) (s<s n<p) = s<s (<-trans m n p m<n n<p)
 
 #### Exercise `trichotomy` (practice) {name=trichotomy}
 
@@ -620,7 +628,16 @@ similar to that used for totality.
 [negation](/Negation/).)
 
 ```
--- Your code goes here
+infix 4 _>_
+
+data _>_ : ℕ → ℕ → Set where
+  z>s : ∀ {n : ℕ} → suc n > zero
+  s>s : ∀ {m n : ℕ} → n > m → suc n > suc m
+
+data Trichotomy : ℕ → ℕ → Set where
+  LT : ∀ {m n : ℕ} → m < n → Trichotomy m n
+  EQ : ∀ {m n : ℕ} → m ≡ n → Trichotomy m n
+  GT : ∀ {m n : ℕ} → m > n → Trichotomy m n
 ```
 
 #### Exercise `+-mono-<` (practice) {name=plus-mono-less}
@@ -629,7 +646,18 @@ Show that addition is monotonic with respect to strict inequality.
 As with inequality, some additional definitions may be required.
 
 ```
--- Your code goes here
++-monoʳ-< : ∀ (n p q : ℕ) → p < q → n + p < n + q
++-monoʳ-< zero p q p<q = p<q
++-monoʳ-< (suc n) p q p<q = s<s (+-monoʳ-< n p q p<q)
+
++-monoˡ-< : ∀ (m n p : ℕ) → m < n → m + p < n + p
++-monoˡ-< m n p m<n rewrite (+-comm m p) | (+-comm n p) = +-monoʳ-< p m n m<n
+
++-mono-< : ∀ (m n p q : ℕ) → m < n → p < q → m + p < n + q
++-mono-< m n p q m<n p<q =
+  let p1 = +-monoˡ-< m n p m<n
+      p2 = +-monoʳ-< n p q p<q
+  in <-trans p1 p2
 ```
 
 #### Exercise `≤-iff-<` (recommended) {name=leq-iff-less}
@@ -637,7 +665,13 @@ As with inequality, some additional definitions may be required.
 Show that `suc m ≤ n` implies `m < n`, and conversely.
 
 ```
--- Your code goes here
+≤-iff-< : ∀ {m n : ℕ} → suc m ≤ n → m < n
+≤-iff-< {zero} {.(suc _)} (s≤s sm≤n) = z<s
+≤-iff-< {suc m} {suc n} (s≤s sm≤n) = s<s (≤-iff-< sm≤n)
+
+<-iff-≤ : ∀ {m n : ℕ} → m < n → suc m ≤ n
+<-iff-≤ z<s = s≤s z≤n
+<-iff-≤ (s<s m<n) = s≤s (<-iff-≤ m<n)
 ```
 
 #### Exercise `<-trans-revisited` (practice) {name=less-trans-revisited}
@@ -647,9 +681,21 @@ using the relation between strict inequality and inequality and
 the fact that inequality is transitive.
 
 ```
--- Your code goes here
-```
+≤-weaken : ∀ {m n : ℕ} → n ≤ m → n ≤ suc m
+≤-weaken z≤n = z≤n
+≤-weaken (s≤s n≤m) = s≤s (≤-weaken n≤m)
 
+≤-tighten : ∀ {m n : ℕ} → suc n ≤ m → n ≤ m
+≤-tighten (s≤s z≤n) = z≤n
+≤-tighten (s≤s (s≤s sn≤m)) = s≤s (≤-tighten (s≤s sn≤m))
+
+<-trans- : ∀ {m n p : ℕ} → m < n → n < p → m < p
+<-trans- m<n n<p =
+  let p1 = <-iff-≤ m<n
+      p2 = <-iff-≤ n<p
+      t = ≤-trans p1 (≤-tighten p2)
+  in ≤-iff-< t
+```
 
 ## Even and odd
 
@@ -754,7 +800,9 @@ successor of the sum of two even numbers, which is even.
 Show that the sum of two odd numbers is even.
 
 ```
--- Your code goes here
+o+o≡e : ∀ {m n : ℕ} → odd m → odd n → even (m + n)
+o+o≡e (suc zero) (suc em) = suc (suc em)
+o+o≡e (suc (suc x)) (suc em) = suc (suc (o+o≡e x (suc em)))
 ```
 
 #### Exercise `Bin-predicates` (stretch) {name=Bin-predicates}
@@ -783,17 +831,66 @@ that holds only if the bistring has a leading one.  A bitstring is
 canonical if it has a leading one (representing a positive number) or
 if it consists of a single zero (representing zero).
 
+```
+data One : Bin → Set where
+  ⟨⟩i : One (⟨⟩ I)
+  _i : ∀ {b : Bin} → One b → One (b I)
+  _o : ∀ {b : Bin} → One b → One (b O)
+
+data Can : Bin → Set where
+  z : Can (⟨⟩ O)
+  nz : ∀ {b : Bin} → One b → Can b
+
+_ : Can (⟨⟩ O)
+_ = z
+
+_ : Can (⟨⟩ I)
+_ = nz $ ⟨⟩i
+
+_ : Can (⟨⟩ I O)
+_ = nz $ ⟨⟩i o
+
+_ : Can (⟨⟩ I I)
+_ = nz $ ⟨⟩i i
+
+_ : Can (⟨⟩ I I O)
+_ = nz $ ⟨⟩i i o
+```
+
 Show that increment preserves canonical bitstrings:
 
     Can b
     ------------
     Can (inc b)
 
+```
+one-inc : ∀ {b : Bin} → One b → One (inc b)
+one-inc ⟨⟩i     = ⟨⟩i o
+one-inc (prf i) = one-inc prf o
+one-inc (prf o) = prf i
+
+inc-can : ∀ {b : Bin} → Can b → Can (inc b)
+inc-can z = nz ⟨⟩i
+inc-can (nz ⟨⟩i)   = nz $ ⟨⟩i o
+inc-can (nz (x i)) = nz $ (one-inc x) o
+inc-can (nz (x o)) = nz $ x i
+```
+
 Show that converting a natural to a bitstring always yields a
 canonical bitstring:
 
     ----------
     Can (to n)
+
+```
+one-inc-to : ∀ {n : ℕ} → One (inc (to n))
+one-inc-to {zero}  = ⟨⟩i
+one-inc-to {suc n} = one-inc $ one-inc-to {n}
+
+can-to : ∀ {n : ℕ} → Can (to n)
+can-to {zero} = z
+can-to {suc n} = nz $ one-inc-to {n}
+```
 
 Show that converting a canonical bitstring to a natural
 and back is the identity:
@@ -802,13 +899,95 @@ and back is the identity:
     ---------------
     to (from b) ≡ b
 
+011
+000
+
+inc y
+
+```
+infixr 5 _+ᵇ_
+_+ᵇ_ : Bin → Bin → Bin
+⟨⟩ +ᵇ y = y
+(x O) +ᵇ ⟨⟩ = x O
+(x O) +ᵇ (y O) = (x +ᵇ y) O
+(x O) +ᵇ (y I) = (x +ᵇ y) I
+(x I) +ᵇ ⟨⟩ = x I
+(x I) +ᵇ (y O) = (x +ᵇ y) I
+(x I) +ᵇ (y I) = (inc (x +ᵇ y)) O
+
+_ : (⟨⟩ O O I) +ᵇ (⟨⟩ O I I) ≡ (⟨⟩ I O O)
+_ = refl
+
++ᵇ-identityᴸ : ∀ (b : Bin) → Can b → ⟨⟩ O +ᵇ b ≡ b
++ᵇ-identityᴸ ⟨⟩ (nz ())
++ᵇ-identityᴸ (b O) prf = refl
++ᵇ-identityᴸ (b I) prf = refl
+
++ᵇ-inc : ∀ (b b' : Bin) → inc b +ᵇ b' ≡ inc (b +ᵇ b')
++ᵇ-inc ⟨⟩ ⟨⟩ = refl
++ᵇ-inc ⟨⟩ (b' O) = refl
++ᵇ-inc ⟨⟩ (b' I) = refl
++ᵇ-inc (b O) ⟨⟩ = refl
++ᵇ-inc (b O) (b' O) = refl
++ᵇ-inc (b O) (b' I) = refl
++ᵇ-inc (b I) ⟨⟩ = refl
++ᵇ-inc (b I) (b' O) = cong _O (+ᵇ-inc b b')
++ᵇ-inc (b I) (b' I) = cong _I (+ᵇ-inc b b')
+
++ᵇ-to-homo : ∀ (n m : ℕ) → to (n + m) ≡ to n +ᵇ to m
++ᵇ-to-homo zero zero = refl
++ᵇ-to-homo zero (suc m) =
+  let can-lemma = inc-can (can-to {m})
+  in sym (+ᵇ-identityᴸ (inc (to m)) can-lemma)
++ᵇ-to-homo (suc n) m rewrite +ᵇ-to-homo n m = sym (+ᵇ-inc (to n) (to m))
+
++ᵇ-shift : ∀ {b : Bin} → One b → b +ᵇ b ≡ b O
++ᵇ-shift ⟨⟩i = refl
++ᵇ-shift (one i) rewrite +ᵇ-shift one = refl
++ᵇ-shift (one o) = cong (λ z₁ → z₁ O) (+ᵇ-shift one)
+
+can-nat : ∀ (b : Bin) → Can b → to (from b) ≡ b
+can-nat .(⟨⟩ O) z = refl
+can-nat (b O) (nz (x o)) =
+  begin
+    to (from (b O))
+  ≡⟨⟩
+    to (from b + (from b + 0))
+  ≡⟨ cong (\x -> to (from b + x)) (+-identityʳ (from b)) ⟩
+    to (from b + (from b))
+  ≡⟨ +ᵇ-to-homo (from b) (from b) ⟩
+    to (from b) +ᵇ to (from b)
+  ≡⟨ cong (\b' → to (from b) +ᵇ b') (can-nat b (nz x)) ⟩
+    to (from b) +ᵇ b
+  ≡⟨ cong (\b' → b' +ᵇ b) (can-nat b (nz x)) ⟩
+    b +ᵇ b
+  ≡⟨ +ᵇ-shift x ⟩
+    (b O)
+  ∎
+can-nat (.⟨⟩ I) (nz ⟨⟩i) = refl
+can-nat (b I) (nz (x i)) =
+  begin
+    inc (to (from b + (from b + zero)))
+  ≡⟨ cong (\x → inc (to (from b + x))) (+-identityʳ (from b)) ⟩
+    inc (to (from b + from b))
+  ≡⟨ cong inc (+ᵇ-to-homo (from b) (from b)) ⟩
+    inc (to (from b) +ᵇ to (from b))
+  ≡⟨ cong (\b' → inc (to (from b) +ᵇ b')) (can-nat b (nz x)) ⟩
+    inc (to (from b) +ᵇ b)
+  ≡⟨ cong (λ z₁ → inc (z₁ +ᵇ b)) (can-nat b (nz x)) ⟩
+    inc (b +ᵇ b)
+  ≡⟨ cong inc (+ᵇ-shift x) ⟩
+    (b I)
+  ∎
+```
+to : ℕ → Bin
+from : Bin → ℕ
++-identityʳ : ∀ (m : ℕ) → m + zero ≡ m
+
 (Hint: For each of these, you may first need to prove related
 properties of `One`. Also, you may need to prove that
 if `One b` then `1` is less or equal to the result of `from b`.)
 
-```
--- Your code goes here
-```
 
 ## Standard library
 

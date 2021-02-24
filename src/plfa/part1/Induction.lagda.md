@@ -27,9 +27,11 @@ and some operations upon them.  We also import a couple of new operations,
 `cong`, `sym`, and `_≡⟨_⟩_`, which are explained below:
 ```
 import Relation.Binary.PropositionalEquality as Eq
+import Relation.Nullary
+open Relation.Nullary using (¬_)
 open Eq using (_≡_; refl; cong; sym)
-open Eq.≡-Reasoning using (begin_; _≡⟨⟩_; step-≡; _∎)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_)
+open Eq.≡-Reasoning
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _^_)
 ```
 
 
@@ -225,21 +227,14 @@ follows by induction.
 Here is the proposition's statement and proof:
 ```
 +-assoc : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
-+-assoc zero n p =
-  begin
-    (zero + n) + p
-  ≡⟨⟩
-    n + p
-  ≡⟨⟩
-    zero + (n + p)
-  ∎
++-assoc zero n p = refl
 +-assoc (suc m) n p =
   begin
     (suc m + n) + p
   ≡⟨⟩
     suc (m + n) + p
   ≡⟨⟩
-    suc ((m + n) + p)
+   suc ((m + n) + p)
   ≡⟨ cong suc (+-assoc m n p) ⟩
     suc (m + (n + p))
   ≡⟨⟩
@@ -403,15 +398,10 @@ Our first lemma states that zero is also a right-identity:
 Here is the lemma's statement and proof:
 ```
 +-identityʳ : ∀ (m : ℕ) → m + zero ≡ m
-+-identityʳ zero =
-  begin
-    zero + zero
-  ≡⟨⟩
-    zero
-  ∎
++-identityʳ zero = refl
 +-identityʳ (suc m) =
   begin
-    suc m + zero
+    (suc m) + zero
   ≡⟨⟩
     suc (m + zero)
   ≡⟨ cong suc (+-identityʳ m) ⟩
@@ -472,21 +462,19 @@ Here is the lemma's statement and proof:
 +-suc : ∀ (m n : ℕ) → m + suc n ≡ suc (m + n)
 +-suc zero n =
   begin
-    zero + suc n
+   zero + suc n
   ≡⟨⟩
-    suc n
+   suc n
   ≡⟨⟩
-    suc (zero + n)
+   suc (zero + n)
   ∎
 +-suc (suc m) n =
   begin
-    suc m + suc n
+   suc m + suc n
   ≡⟨⟩
-    suc (m + suc n)
+   suc (m + suc n)
   ≡⟨ cong suc (+-suc m n) ⟩
-    suc (suc (m + n))
-  ≡⟨⟩
-    suc (suc m + n)
+   suc (suc m + n)
   ∎
 ```
 The signature states that we are defining the identifier `+-suc` which provides
@@ -546,8 +534,6 @@ Finally, here is our proposition's statement and proof:
   ≡⟨ +-suc m n ⟩
     suc (m + n)
   ≡⟨ cong suc (+-comm m n) ⟩
-    suc (n + m)
-  ≡⟨⟩
     suc n + m
   ∎
 ```
@@ -607,13 +593,13 @@ Here is an example:
 +-rearrange : ∀ (m n p q : ℕ) → (m + n) + (p + q) ≡ m + (n + p) + q
 +-rearrange m n p q =
   begin
-    (m + n) + (p + q)
+   (m + n) + (p + q)
   ≡⟨ +-assoc m n (p + q) ⟩
-    m + (n + (p + q))
+   m + (n + (p + q))
   ≡⟨ cong (m +_) (sym (+-assoc n p q)) ⟩
     m + ((n + p) + q)
   ≡⟨ sym (+-assoc m (n + p) q) ⟩
-    (m + (n + p)) + q
+   m + (n + p) + q
   ∎
 ```
 No induction is required, we simply apply associativity twice.
@@ -769,9 +755,11 @@ It is instructive to see how to build the alternative proof of
 associativity using the interactive features of Agda in Emacs.
 Begin by typing:
 
-    +-assoc′ : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
-    +-assoc′ m n p = ?
-
+```
++-assoc- : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
++-assoc- zero n p = refl
++-assoc- (suc m) n p rewrite +-assoc- m n p = refl
+```
 The question mark indicates that you would like Agda to help with
 filling in that part of the code.  If you type `C-c C-l` (control-c
 followed by control-l), the question mark will be replaced:
@@ -814,27 +802,6 @@ Going into hole 0 and typing `C-c C-,` will display the text:
     ————————————————————————————————————————————————————————————
     p : ℕ
     n : ℕ
-
-This indicates that after simplification the goal for hole 0 is as
-stated, and that variables `p` and `n` of the stated types are
-available to use in the proof.  The proof of the given goal is
-trivial, and going into the goal and typing `C-c C-r` will fill it in.
-Typing `C-c C-l` renumbers the remaining hole to 0:
-
-    +-assoc′ : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
-    +-assoc′ zero n p = refl
-    +-assoc′ (suc m) n p = { }0
-
-Going into the new hole 0 and typing `C-c C-,` will display the text:
-
-    Goal: suc ((m + n) + p) ≡ suc (m + (n + p))
-    ————————————————————————————————————————————————————————————
-    p : ℕ
-    n : ℕ
-    m : ℕ
-
-Again, this gives the simplified goal and the available variables.
-In this case, we need to rewrite by the induction
 hypothesis, so let's edit the text accordingly:
 
     +-assoc′ : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
@@ -868,9 +835,18 @@ just apply the previous results which show addition
 is associative and commutative.
 
 ```
--- Your code goes here
++-swap : ∀ (m n p : ℕ) → m + (n + p) ≡ n + (m + p)
++-swap m n p =
+  begin
+    m + (n + p)
+  ≡⟨ sym (+-assoc m n p) ⟩
+    (m + n) + p
+  ≡⟨ cong (_+ p) (+-comm m n)⟩
+    (n + m) + p
+  ≡⟨ +-assoc n m p ⟩
+    n + (m + p)
+  ∎
 ```
-
 
 #### Exercise `*-distrib-+` (recommended) {name=times-distrib-plus}
 
@@ -881,7 +857,22 @@ Show multiplication distributes over addition, that is,
 for all naturals `m`, `n`, and `p`.
 
 ```
--- Your code goes here
+*-distrib-+ : ∀ (m n p : ℕ) → (m + n) * p ≡ m * p + n * p
+*-distrib-+ zero n p = refl
+*-distrib-+ (suc m) n p =
+  begin
+    (suc m + n) * p
+  ≡⟨⟩
+    suc (m + n) * p
+  ≡⟨⟩
+    p + (m + n) * p
+  ≡⟨ cong (p +_) (*-distrib-+ m n p)⟩
+    p + ((m * p) + (n * p))
+  ≡⟨ sym (+-assoc p (m * p) (n * p)) ⟩
+    p + (m * p) + n * p
+  ≡⟨⟩
+    suc m * p + n * p
+  ∎
 ```
 
 
@@ -894,7 +885,18 @@ Show multiplication is associative, that is,
 for all naturals `m`, `n`, and `p`.
 
 ```
--- Your code goes here
+*-assoc : ∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)
+*-assoc zero n p = refl
+*-assoc (suc m) n p =
+  begin
+    (suc m * n) * p
+  ≡⟨⟩
+    (n + (m * n)) * p
+  ≡⟨ *-distrib-+ n (m * n) p ⟩
+    n * p + m * n * p
+  ≡⟨ cong (_+_ (n * p)) (*-assoc m n p) ⟩
+    suc m * (n * p)
+  ∎
 ```
 
 
@@ -908,9 +910,51 @@ for all naturals `m` and `n`.  As with commutativity of addition,
 you will need to formulate and prove suitable lemmas.
 
 ```
--- Your code goes here
-```
+*-identityʳ : ∀ (n : ℕ) → n * zero ≡ zero
+*-identityʳ  zero = refl
+*-identityʳ  (suc n) =
+  begin
+    suc n * zero
+  ≡⟨⟩
+    zero + (n * zero)
+  ≡⟨ *-identityʳ  n ⟩
+    zero
+  ∎
 
+*-suc : ∀ (m n : ℕ) → m * suc n ≡ m + m * n
+*-suc zero n = refl
+*-suc (suc m) n =
+  begin
+    suc m * suc n
+  ≡⟨⟩
+    suc n + (m * suc n)
+  ≡⟨ cong (suc n +_) (*-suc m n) ⟩
+    suc n + (m + m * n)
+  ≡⟨ sym (+-assoc (suc n) m (m * n)) ⟩
+    (suc n + m) + (m * n)
+  ≡⟨⟩
+    (suc (n + m)) + (m * n)
+  ≡⟨ cong (_+ (m * n)) (cong suc (+-comm n m)) ⟩
+    suc (m + n) + (m * n)
+  ≡⟨ cong suc (+-assoc m n (m * n)) ⟩
+    suc (m + (n + m * n))
+  ≡⟨⟩
+    suc m + (suc m * n)
+  ∎
+
+*-comm : ∀ (m n : ℕ) → m * n ≡ n * m
+*-comm m zero = *-identityʳ m
+*-comm m (suc n) =
+  begin
+    m * suc n
+  ≡⟨ *-suc m n ⟩
+    m + m * n
+  ≡⟨ cong (m +_) (*-comm m n)⟩
+    m + n * m
+  ≡⟨⟩
+    suc n * m
+  ∎
+```
 
 #### Exercise `0∸n≡0` (practice) {name=zero-monus}
 
@@ -921,7 +965,10 @@ Show
 for all naturals `n`. Did your proof require induction?
 
 ```
--- Your code goes here
+zero-monus : ∀ (n : ℕ) → zero ∸ n ≡ zero
+zero-monus zero = refl
+zero-monus (suc n) = refl
+
 ```
 
 
@@ -934,7 +981,28 @@ Show that monus associates with addition, that is,
 for all naturals `m`, `n`, and `p`.
 
 ```
--- Your code goes here
+monus-plus-assoc : ∀ (m n p : ℕ) → m ∸ n ∸ p ≡ m ∸ (n + p)
+monus-plus-assoc zero n p =
+  begin
+    (zero ∸ n) ∸ p
+  ≡⟨ cong (_∸ p) (zero-monus n) ⟩
+    zero ∸ p
+  ≡⟨ zero-monus p ⟩
+    zero
+  ≡⟨ sym (zero-monus (n + p)) ⟩
+    zero ∸ (n + p)
+  ∎
+monus-plus-assoc (suc m) zero p = refl
+monus-plus-assoc (suc m) (suc n) p =
+  begin
+    suc m ∸ suc n ∸ p
+  ≡⟨⟩
+    m ∸ n ∸ p
+  ≡⟨ monus-plus-assoc m n p ⟩
+    m ∸ (n + p)
+  ≡⟨⟩
+    suc m ∸ (suc n + p)
+  ∎
 ```
 
 
@@ -948,6 +1016,91 @@ Show the following three laws
 
 for all `m`, `n`, and `p`.
 
+```
+^-distribˡ-|-* : ∀ m n p → m ^ (n + p) ≡ (m ^ n) * (m ^ p)
+^-distribˡ-|-* m zero p =
+  begin
+    (m ^ (zero + p))
+  ≡⟨⟩
+    (m ^ p)
+  ≡⟨ sym (+-identityʳ (m ^ p)) ⟩
+    (m ^ p) + zero
+  ≡⟨⟩
+    (m ^ zero) * (m ^ p)
+  ∎
+^-distribˡ-|-* m (suc n) p =
+  begin
+    (m ^ (suc n + p))
+  ≡⟨⟩
+    m * (m ^ (n + p))
+  ≡⟨ cong (m *_) (^-distribˡ-|-* m n p) ⟩
+    m * ((m ^ n) * (m ^ p))
+  ≡⟨ sym (*-assoc m (m ^ n) (m ^ p))⟩
+    m * (m ^ n) * (m ^ p)
+  ≡⟨⟩
+    (m ^ suc n) * (m ^ p)
+  ∎
+
+^-distribʳ-* : ∀ (m n p : ℕ) → (m * n) ^ p ≡ (m ^ p) * (n ^ p)
+^-distribʳ-* m n zero = refl
+^-distribʳ-* m n (suc p) =
+  begin
+    ((m * n) ^ suc p)
+  ≡⟨⟩
+    m * n * ((m * n) ^ p)
+  ≡⟨ cong ((m * n) *_) (^-distribʳ-* m n p) ⟩
+    (m * n) * ((m ^ p) * (n ^ p))
+  ≡⟨ cong ( _* ((m ^ p) * (n ^ p))) (*-comm m n) ⟩
+    (n * m) * ((m ^ p) * (n ^ p))
+  ≡⟨ sym (*-assoc (n * m) (m ^ p) (n ^ p)) ⟩
+    (n * m) * (m ^ p) * (n ^ p)
+  ≡⟨ cong (_* (n ^ p)) (*-assoc n m (m ^ p)) ⟩
+    n * (m * (m ^ p)) * (n ^ p)
+  ≡⟨ cong (_* (n ^ p)) (*-comm n (m * (m ^ p))) ⟩
+    m * (m ^ p) * n * (n ^ p)
+  ≡⟨ *-assoc (m * (m ^ p)) n (n ^ p) ⟩
+    (m * (m ^ p)) * (n * (n ^ p))
+  ≡⟨⟩
+    (m ^ suc p) * (n ^ suc p)
+  ∎
+
+^-one : ∀ n → 1 ^ n ≡ 1
+^-one zero = refl
+^-one (suc n) =
+  begin
+    (1 ^ n) + 0
+  ≡⟨ +-identityʳ (1 ^ n) ⟩
+    1 ^ n
+  ≡⟨ ^-one n ⟩
+    1
+  ∎
+
+^-*-assoc : ∀ (m n p : ℕ) → (m ^ n) ^ p ≡ m ^ (n * p)
+^-*-assoc m zero p =
+  begin
+    ((m ^ zero) ^ p)
+  ≡⟨⟩
+    (1 ^ p)
+  ≡⟨ ^-one p ⟩
+    1
+  ≡⟨⟩
+    (m ^ (zero * p))
+  ∎
+^-*-assoc m (suc n) p =
+  begin
+    (m ^ suc n) ^ p
+  ≡⟨⟩
+    (m * (m ^ n)) ^ p
+  ≡⟨ ^-distribʳ-* m (m ^ n) p ⟩
+    (m ^ p) * ((m ^ n) ^ p)
+  ≡⟨ cong ((m ^ p) *_) (^-*-assoc m n p) ⟩
+    (m ^ p) * (m ^ (n * p))
+  ≡⟨ sym (^-distribˡ-|-* m p (n * p)) ⟩
+    m ^ (p + n * p)
+  ≡⟨⟩
+    m ^ (suc n * p)
+  ∎
+```
 
 #### Exercise `Bin-laws` (stretch) {name=Bin-laws}
 
@@ -970,7 +1123,62 @@ over bitstrings:
 For each law: if it holds, prove; if not, give a counterexample.
 
 ```
--- Your code goes here
+data Bin : Set where
+  ⟨⟩ : Bin
+  _O : Bin → Bin
+  _I : Bin → Bin
+
+inc : Bin → Bin
+inc ⟨⟩ = ⟨⟩ I
+inc (x O) = x I
+inc (x I) = (inc x) O
+
+to : ℕ → Bin
+to zero = ⟨⟩ O
+to (suc n) = inc (to n)
+
+from : Bin → ℕ
+from ⟨⟩ = zero
+from (n O) = 2 * from n
+from (n I) = 1 + 2 * from n
+
+from∘inc : ∀ (b : Bin) → from (inc b) ≡ suc (from b)
+from∘inc ⟨⟩ = refl
+from∘inc (b O) = refl
+from∘inc (b I) =
+  begin
+    from (inc (b I))
+  ≡⟨⟩
+    from (inc b) + (from (inc b) + 0)
+  ≡⟨ cong (_+ (from (inc b) + 0)) (from∘inc b) ⟩
+    suc (from b) + (from (inc b) + 0)
+  ≡⟨ cong (suc (from b) +_) (cong (_+ 0) (from∘inc b)) ⟩
+    suc (from b) + (suc (from b) + 0)
+  ≡⟨⟩
+    suc (from b) + suc (from b + 0)
+  ≡⟨ +-suc (suc (from b)) (from b + 0) ⟩
+    suc (suc (from b + (from b + 0)))
+  ≡⟨⟩
+    suc (from (b I))
+  ∎
+
+to∘from : ¬ (∀ x →  to (from x) ≡ x)
+to∘from eq with eq ⟨⟩
+... | ()
+
+from∘to : ∀ (n : ℕ) → from (to n) ≡ n
+from∘to zero = refl
+from∘to (suc n) =
+  begin
+    from (to (suc n))
+  ≡⟨⟩
+    from (inc (to n))
+  ≡⟨ from∘inc (to n) ⟩
+    suc (from (to n))
+  ≡⟨ cong suc (from∘to n) ⟩
+   suc n
+  ∎
+
 ```
 
 

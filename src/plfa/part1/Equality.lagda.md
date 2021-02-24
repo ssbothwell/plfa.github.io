@@ -183,6 +183,7 @@ used throughout the book.  We package the declarations into a module,
 named `≡-Reasoning`, to match the format used in Agda's standard
 library:
 ```
+
 module ≡-Reasoning {A : Set} where
 
   infix  1 begin_
@@ -361,10 +362,73 @@ notation for `≡-Reasoning`.  Define `≤-Reasoning` analogously, and use
 it to write out an alternative proof that addition is monotonic with
 regard to inequality.  Rewrite all of `+-monoˡ-≤`, `+-monoʳ-≤`, and `+-mono-≤`.
 
+subst : ∀ {A : Set} {x y : A} (P : A → Set) → x ≡ y → P x → P y
 ```
--- Your code goes here
-```
+infix 4 _≤_
+data _≤_ : ℕ → ℕ → Set where
+  z≤n : ∀ {n : ℕ} → zero ≤ n
+  s≤s : ∀ {m n : ℕ} → m ≤ n → suc m ≤ suc n
 
+trans-≤ : ∀ {x y z : ℕ} → x ≤ y → y ≤ z → x ≤ z
+trans-≤ z≤n z≤n = z≤n
+trans-≤ z≤n (s≤s y) = z≤n
+trans-≤ (s≤s x) (s≤s y) = s≤s (trans-≤ x y)
+
+module ≤-Reasoning where
+
+  infix  1 begin-≤_
+  infixr 2 _≤⟨⟩_ _≤⟨_⟩_ _=⟨_⟩_
+  infix  3 _∎-≤
+
+  begin-≤_ : ∀ {x y : ℕ} → x ≤ y → x ≤ y
+  begin-≤ x≤y  =  x≤y
+
+  _≤⟨⟩_ : ∀ (x : ℕ) {y : ℕ} → x ≤ y → x ≤ y
+  x ≤⟨⟩ x≤y  =  x≤y
+
+  _≤⟨_⟩_ : ∀ (x : ℕ) {y z : ℕ} → x ≤ y → y ≤ z → x ≤ z
+  x ≤⟨ x≤y ⟩ y≤z  =  trans-≤ x≤y y≤z
+
+  _=⟨_⟩_ : ∀ (x : ℕ) {y z : ℕ} → x ≡ y → y ≤ z → x ≤ z
+  _=⟨_⟩_ x {z = z} x≡y y≤z  =  subst (_≤ z) (sym x≡y) y≤z
+
+  _∎-≤ : ∀ (x : ℕ) → x ≤ x
+  zero ∎-≤ = z≤n
+  suc x ∎-≤ = s≤s (x ∎-≤)
+
+open ≤-Reasoning
+
++-monoʳ-≤ : ∀ (n p q : ℕ) → p ≤ q → n + p ≤ n + q
++-monoʳ-≤ zero p q p≤q = p≤q
++-monoʳ-≤ (suc n) p q p≤q =
+  begin-≤
+    suc (n + p)
+  ≤⟨ s≤s (+-monoʳ-≤ n p q p≤q) ⟩
+    suc (n + q)
+  ∎-≤
+
++-monoˡ-≤ : ∀ (m n p : ℕ) → m ≤ n → m + p ≤ n + p
++-monoˡ-≤ m n p m≤n =
+  begin-≤
+    m + p
+  =⟨ +-comm m p ⟩
+    p + m
+  ≤⟨ +-monoʳ-≤ p m n m≤n ⟩
+    p + n
+  =⟨ +-comm p n ⟩
+    n + p
+  ∎-≤
+  
++-mono-≤ : ∀ (m n p q : ℕ) → m ≤ n → p ≤ q → m + p ≤ n + q
++-mono-≤ m n p q m≤n p≤q =
+  begin-≤
+    (m + p)
+  ≤⟨ +-monoˡ-≤ m n p m≤n ⟩
+    (n + p)
+  ≤⟨ +-monoʳ-≤ n p q p≤q ⟩
+    (n + q)
+  ∎-≤
+```
 
 
 ## Rewriting
@@ -404,11 +468,8 @@ corresponds to equality:
 
 We can then prove the desired property as follows:
 ```
-even-comm : ∀ (m n : ℕ)
-  → even (m + n)
-    ------------
-  → even (n + m)
-even-comm m n ev  rewrite +-comm n m  =  ev
+even-comm : ∀ (m n : ℕ) → even (m + n) → even (n + m)
+even-comm m n ev rewrite +-comm n m = ev
 ```
 Here `ev` ranges over evidence that `even (m + n)` holds, and we show
 that it also provides evidence that `even (n + m)` holds.  In
@@ -498,8 +559,6 @@ Note also the use of the _dot pattern_, `.(n + m)`.  A dot pattern
 consists of a dot followed by an expression, and is used when other
 information forces the value matched to be equal to the value of the
 expression in the dot pattern.  In this case, the identification of
-`m + n` and `n + m` is justified by the subsequent matching of
-`+-comm m n` against `refl`.  One might think that the first clause is
 redundant as the information is inherent in the second clause, but in
 fact Agda is rather picky on this point: omitting the first clause or
 reversing the order of the clauses will cause Agda to report an error.
@@ -557,34 +616,26 @@ Leibniz equality is reflexive and transitive,
 where the first follows by a variant of the identity function
 and the second by a variant of function composition:
 ```
-refl-≐ : ∀ {A : Set} {x : A}
-  → x ≐ x
+refl-≐ : ∀ {A : Set} {x : A} → x ≐ x
 refl-≐ P Px  =  Px
 
-trans-≐ : ∀ {A : Set} {x y z : A}
-  → x ≐ y
-  → y ≐ z
-    -----
-  → x ≐ z
-trans-≐ x≐y y≐z P Px  =  y≐z P (x≐y P Px)
+trans-≐ : ∀ {A : Set} {x y z : A} → x ≐ y → y ≐ z → x ≐ z
+trans-≐ x≐y y≐z P Px = y≐z P (x≐y P Px)
 ```
 
 Symmetry is less obvious.  We have to show that if `P x` implies `P y`
 for all predicates `P`, then the implication holds the other way round
 as well:
 ```
-sym-≐ : ∀ {A : Set} {x y : A}
-  → x ≐ y
-    -----
-  → y ≐ x
-sym-≐ {A} {x} {y} x≐y P  =  Qy
-  where
-    Q : A → Set
-    Q z = P z → P x
-    Qx : Q x
-    Qx = refl-≐ P
-    Qy : Q y
-    Qy = x≐y Q Qx
+sym-≐ : ∀ {A : Set} {x y : A} → x ≐ y → y ≐ x
+sym-≐ {A} {x} {y} x≐y P Py = 
+  let Pz⇒Px : A → Set
+      Pz⇒Px z = P z → P x
+      Px⇒Px : Pz⇒Px x
+      Px⇒Px = refl-≐ P
+      Py⇒Px : P y → P x
+      Py⇒Px = x≐y Pz⇒Px Px⇒Px
+  in Py⇒Px Py
 ```
 
 Given `x ≐ y`, a specific `P`, we have to construct a proof that `P y`
@@ -610,18 +661,15 @@ This direction follows from substitution, which we showed earlier.
 In the reverse direction, given that for any `P` we can take a proof of `P x`
 to a proof of `P y` we need to show `x ≡ y`:
 ```
-≐-implies-≡ : ∀ {A : Set} {x y : A}
-  → x ≐ y
-    -----
-  → x ≡ y
-≐-implies-≡ {A} {x} {y} x≐y  =  Qy
-  where
-    Q : A → Set
-    Q z = x ≡ z
-    Qx : Q x
-    Qx = refl
-    Qy : Q y
-    Qy = x≐y Q Qx
+≐-implies-≡ : ∀ {A : Set} {x y : A} → x ≐ y → x ≡ y
+≐-implies-≡ {A} {x} {y} x≐y  =
+  let Pz≣Px : A → Set
+      Pz≣Px z = x ≡ z
+      Px≡Px : Pz≣Px x
+      Px≡Px = refl
+      Px≡Py : x ≡ y
+      Px≡Py = x≐y Pz≣Px Px≡Px
+  in Px≡Py
 ```
 The proof is similar to that for symmetry of Leibniz equality. We take
 `Q` to be the predicate that holds of `z` if `x ≡ z`. Then `Q x` is

@@ -21,9 +21,11 @@ distributivity.
 
 ```
 import Relation.Binary.PropositionalEquality as Eq
+open import Relation.Nullary using (¬_)
+open import Data.Nat.Properties
 open Eq using (_≡_; refl; cong; cong-app)
 open Eq.≡-Reasoning
-open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 open import Data.Nat.Properties using (+-comm)
 ```
 
@@ -220,10 +222,10 @@ and `from` to be the identity function:
   → A ≃ A
 ≃-refl =
   record
-    { to      = λ{x → x}
-    ; from    = λ{y → y}
-    ; from∘to = λ{x → refl}
-    ; to∘from = λ{y → refl}
+    { to      = λ x → x
+    ; from    = λ y → y
+    ; from∘to = λ x → refl
+    ; to∘from = λ y → refl
     }
 ```
 In the above, `to` and `from` are both bound to identity functions,
@@ -242,7 +244,7 @@ and `from`, and `from∘to` and `to∘from`:
 ≃-sym A≃B =
   record
     { to      = from A≃B
-    ; from    = to   A≃B
+    ; from    = to A≃B
     ; from∘to = to∘from A≃B
     ; to∘from = from∘to A≃B
     }
@@ -264,7 +266,7 @@ functions, and use equational reasoning to combine the inverses:
         begin
           (from A≃B ∘ from B≃C) ((to B≃C ∘ to A≃B) x)
         ≡⟨⟩
-          from A≃B (from B≃C (to B≃C (to A≃B x)))
+          from A≃B (from B≃C ((to B≃C ∘ to A≃B) x))
         ≡⟨ cong (from A≃B) (from∘to B≃C (to A≃B x)) ⟩
           from A≃B (to A≃B x)
         ≡⟨ from∘to A≃B x ⟩
@@ -439,15 +441,9 @@ open ≲-Reasoning
 
 Show that every isomorphism implies an embedding.
 ```
-postulate
-  ≃-implies-≲ : ∀ {A B : Set}
-    → A ≃ B
-      -----
-    → A ≲ B
-```
-
-```
--- Your code goes here
+≃-implies-≲ : ∀ {A B : Set} → A ≃ B → A ≲ B
+≃-implies-≲ record { to = to ; from = from ; from∘to = from∘to ; to∘from = to∘from } =
+  record { to = to ; from = from ; from∘to = from∘to }
 ```
 
 #### Exercise `_⇔_` (practice) {name=iff}
@@ -462,7 +458,17 @@ record _⇔_ (A B : Set) : Set where
 Show that equivalence is reflexive, symmetric, and transitive.
 
 ```
--- Your code goes here
+⇔-refl : ∀ {A : Set} → A ⇔ A
+⇔-refl = record { to = λ z → z ; from = λ z → z }
+
+⇔-sym : ∀ {A B : Set} → A ⇔ B → B ⇔ A
+⇔-sym record { to = to ; from = from } =
+  record { to = from ; from = to }
+
+
+⇔-trans : ∀ {A B C : Set} → A ⇔ B → B ⇔ C → A ⇔ C
+⇔-trans record { to = to₁ ; from = from₁ } record { to = to ; from = from } =
+  record { to = λ z → to (to₁ z) ; from = λ z → from₁ (from z) }
 ```
 
 #### Exercise `Bin-embedding` (stretch) {name=Bin-embedding}
@@ -482,7 +488,66 @@ which satisfy the following property:
 
 Using the above, establish that there is an embedding of `ℕ` into `Bin`.
 ```
--- Your code goes here
+data Bin : Set where
+  ⟨⟩ : Bin
+  _O : Bin → Bin
+  _I : Bin → Bin
+
+inc : Bin → Bin
+inc ⟨⟩ = ⟨⟩ I
+inc (x O) = x I
+inc (x I) = (inc x) O
+
+to-bin : ℕ → Bin
+to-bin zero = ⟨⟩ O
+to-bin (suc n) = inc (to-bin n)
+
+from-bin : Bin → ℕ
+from-bin ⟨⟩ = zero
+from-bin (n O) = 2 * from-bin n
+from-bin (n I) = 1 + 2 * from-bin n
+
+from∘inc : ∀ (b : Bin) → from-bin (inc b) ≡ suc (from-bin b)
+from∘inc ⟨⟩ = refl
+from∘inc (b O) = refl
+from∘inc (b I) =
+  begin
+    from-bin (inc (b I))
+  ≡⟨⟩
+    from-bin (inc b) + (from-bin (inc b) + 0)
+  ≡⟨ cong (_+ (from-bin (inc b) + 0)) (from∘inc b) ⟩
+    suc (from-bin b) + (from-bin (inc b) + 0)
+  ≡⟨ cong (suc (from-bin b) +_) (cong (_+ 0) (from∘inc b)) ⟩
+    suc (from-bin b) + (suc (from-bin b) + 0)
+  ≡⟨⟩
+    suc (from-bin b) + suc (from-bin b + 0)
+  ≡⟨ +-suc (suc (from-bin b)) (from-bin b + 0) ⟩
+    suc (suc (from-bin b + (from-bin b + 0)))
+  ≡⟨⟩
+    suc (from-bin (b I))
+  ∎
+
+to∘from-bin : ¬ (∀ x →  to-bin (from-bin x) ≡ x)
+to∘from-bin eq with eq ⟨⟩
+... | ()
+
+from∘to-bin : ∀ (n : ℕ) → from-bin (to-bin n) ≡ n
+from∘to-bin zero = refl
+from∘to-bin (suc n) =
+  begin
+    from-bin (to-bin (suc n))
+  ≡⟨⟩
+    from-bin (inc (to-bin n))
+  ≡⟨ from∘inc (to-bin n) ⟩
+    suc (from-bin (to-bin n))
+  ≡⟨ cong suc (from∘to-bin n) ⟩
+   suc n
+  ∎
+
+_ : ℕ ≲ Bin
+_ = record { to = to-bin ; from = from-bin ; from∘to = from∘to-bin }
+
+
 ```
 
 Why do `to` and `from` not form an isomorphism?

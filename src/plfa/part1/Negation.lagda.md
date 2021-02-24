@@ -1,5 +1,5 @@
 ---
-title     : "Negation: Negation, with intuitionistic and classical logic"
+title     : "Negation: Negation, with intuitionistic and classical logic; "
 layout    : page
 prev      : /Connectives/
 permalink : /Negation/
@@ -16,11 +16,12 @@ and classical logic.
 ## Imports
 
 ```
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Data.Nat using (ℕ; zero; suc)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _>_; s≤s; z≤n)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Product using (_×_)
+open import Data.Sum using (swap)
+open import Data.Product
 open import plfa.part1.Isomorphism using (_≃_; extensionality)
 ```
 
@@ -34,6 +35,7 @@ as implication of false:
 ¬_ : Set → Set
 ¬ A = A → ⊥
 ```
+
 This is a form of _reductio ad absurdum_: if assuming `A` leads
 to the conclusion `⊥` (an absurdity), then we must have `¬ A`.
 
@@ -76,6 +78,8 @@ we have only half of this equivalence, namely that `A` implies `¬ ¬ A`:
   → ¬ ¬ A
 ¬¬-intro x  =  λ{¬x → ¬x x}
 ```
+¬ ¬ A ≡ (A → ⊥) → ⊥
+
 Let `x` be evidence of `A`. We show that assuming
 `¬ A` leads to a contradiction, and hence `¬ ¬ A` must hold.
 Let `¬x` be evidence of `¬ A`.  Then from `A` and `¬ A`
@@ -193,7 +197,8 @@ Using negation, show that
 is irreflexive, that is, `n < n` holds for no `n`.
 
 ```
--- Your code goes here
+strict-inequality-irrefl : ∀ {n : ℕ} → ¬ (n < n)
+strict-inequality-irrefl (_≤_.s≤s prf) = strict-inequality-irrefl prf
 ```
 
 
@@ -211,7 +216,43 @@ Here "exactly one" means that not only one of the three must hold,
 but that when one holds the negation of the other two must also hold.
 
 ```
--- Your code goes here
+data Trichotomy : ℕ → ℕ → Set where
+  LT : ∀ {m n : ℕ} → m < n → Trichotomy m n
+  EQ : ∀ {m n : ℕ} → m ≡ n → Trichotomy m n
+  GT : ∀ {m n : ℕ} → m > n → Trichotomy m n
+
+suc-trichotomy : {m n : ℕ} → Trichotomy m n → Trichotomy (suc m) (suc n)
+suc-trichotomy (LT x) = LT (s≤s x)
+suc-trichotomy (EQ refl) = EQ refl
+suc-trichotomy (GT x) = GT (s≤s x)
+
+trichotomy : ∀ (m n : ℕ) → Trichotomy m n
+trichotomy zero zero = EQ refl 
+trichotomy zero (suc n) = LT (s≤s z≤n) 
+trichotomy (suc m) zero = GT (s≤s z≤n)
+trichotomy (suc m) (suc n) = suc-trichotomy (trichotomy m n)
+
+suc-inj-≡ : ∀ {m n : ℕ} → suc m ≡ suc n → m ≡ n
+suc-inj-≡ refl = refl
+
+<-not-≡ : ∀ {m n : ℕ} → m < n → ¬ (m ≡ n)
+<-not-≡ (s≤s prf) refl = <-not-≡ prf (suc-inj-≡ refl)
+
+<-not-> : ∀ {m n : ℕ} → m < n → ¬ (m > n)
+<-not-> (s≤s prf) (s≤s gt) = <-not-> prf gt
+
+≡-not-< : ∀ {m n : ℕ} → m ≡ n → ¬ (m < n)
+≡-not-< refl (s≤s lt) = ≡-not-< refl lt
+
+≡-not-> : ∀ {m n : ℕ} → m ≡ n → ¬ (m > n)
+≡-not-> refl (s≤s gt) = ≡-not-> refl gt
+
+>-not-< : ∀ {m n : ℕ} → m > n → ¬ (m < n)
+>-not-< (s≤s prf) (s≤s lt) = >-not-< prf lt
+
+>-not-≡ : ∀ {m n : ℕ} → m > n → ¬ (m ≡ n)
+>-not-≡ (s≤s prf) refl = >-not-≡ prf refl
+
 ```
 
 #### Exercise `⊎-dual-×` (recommended)
@@ -224,13 +265,31 @@ version of De Morgan's Law.
 This result is an easy consequence of something we've proved previously.
 
 ```
--- Your code goes here
-```
 
+absurd : ∀ {A : Set} → ⊥ → A
+absurd ()
+
+--de-morgan : ∀ {A B : Set} → ¬ (A ⊎ B) ≃ (¬ A) × (¬ B)
+--de-morgan =
+--  record
+--    { from = λ{ (fst , snd) → (λ{ (inj₁ x) → fst x ; (inj₂ y) → snd y }) }
+--    ; to = λ{ f → ((λ{ a → f (inj₁ a) }), (λ{ b → f (inj₂ b) }))}
+--    ; from∘to = λ{f → extensionality (λ{a⊎b → absurd (f a⊎b) }) }
+--    ; to∘from = λ{ (fst , snd) → {!!} }
+--    }
+
+```
 
 Do we also have the following?
 
     ¬ (A × B) ≃ (¬ A) ⊎ (¬ B)
+```
+post : ∀ {A B : Set} → (¬ A) ⊎ (¬ B) → ¬ (A × B)
+post = λ{ (inj₁ f) (a , _) → f a ; (inj₂ g) (_ , b) → g b }
+
+demorgan⇒weak-lem : ∀ {X : Set} → (∀ {A B : Set} → ¬ (A × B) → (¬ A) ⊎ (¬ B)) → ¬ (¬ X) ⊎ ¬ X
+demorgan⇒weak-lem f = f (λ{ (¬x , x) → ¬x x })
+```
 
 If so, prove; if not, can you give a relation weaker than
 isomorphism that relates the two sides?
@@ -292,7 +351,7 @@ meaning that the negation of its negation is provable (and hence that
 its negation is never provable):
 ```
 em-irrefutable : ∀ {A : Set} → ¬ ¬ (A ⊎ ¬ A)
-em-irrefutable = λ k → k (inj₂ (λ x → k (inj₁ x)))
+em-irrefutable {A} k = k (inj₂ (λ{ a → k (inj₁ a) }))
 ```
 The best way to explain this code is to develop it interactively:
 
@@ -380,10 +439,60 @@ Consider the following principles:
 
 Show that each of these implies all the others.
 
+-- absurd (f {!!})
+dne {A} f = (λ{ (inj₁ l) → l ; (inj₂ r) → absurd (f r) }) lem
 ```
--- Your code goes here
+postulate lem : ∀ {A : Set} → A ⊎ ¬ A
+
+dne : ∀ {A : Set} → ¬ ¬ A → A
+dne f with lem
+... | inj₁ x = x
+... | inj₂ y = absurd (f y)
+
+pierce : ∀ {A B : Set} → ((A → B) → A) → A
+pierce f = dne λ{ ¬a → ¬a (f ((λ{a → absurd (¬a a)})))}
+
+impl-disj : ∀ {A B : Set} → (A → B) → ¬ A ⊎ B
+impl-disj {A} f with lem {A}
+... | inj₁ x = inj₂ (f x)
+... | inj₂ y = inj₁ y
+
+demorgan : ∀ {A B : Set} → ¬ (¬ A × ¬ B) → A ⊎ B
+demorgan {A} f with lem {A}
+... | inj₁ x = inj₁ x
+... | inj₂ y = inj₂ (dne (λ{¬b → f ((y , ¬b))}))
+
+Lem' : Set₁
+Lem' = ∀ {A : Set} → A ⊎ ¬ A
+
+Dne' : Set₁
+Dne' = ∀ {A : Set} → ¬ ¬ A → A
+
+Pierce' : Set₁
+Pierce' = ∀ {A B : Set} → ((A → B) → A) → A
+
+ImplDisj' : Set₁
+ImplDisj' = ∀ {A B : Set} → (A → B) → ¬ A ⊎ B
+
+Demorgan' : Set₁
+Demorgan' = ∀ {A B : Set} → ¬ (¬ A × ¬ B) → A ⊎ B
+
+dne-lem : Dne' → Lem'
+dne-lem f = f λ{g → g (inj₁ (f (λ ¬a → g (inj₂ ¬a))))}
+
+pierce-dne : Pierce' → Dne'
+pierce-dne f g = f {B = ⊥} λ h → absurd (g h)
+
+impldisj-lem : ImplDisj' → Lem'
+impldisj-lem f = Data.Sum.swap (f λ z → z)
+
+demorgan-lem : Demorgan' → Lem'
+demorgan-lem f = f (λ{ (¬a , ¬¬a) → ¬¬a ¬a })
+
 ```
 
+¬ A = A → ⊥
+¬ (¬ A) = (A → ⊥) → ⊥
 
 #### Exercise `Stable` (stretch)
 
@@ -396,7 +505,11 @@ Show that any negated formula is stable, and that the conjunction
 of two stable formulas is stable.
 
 ```
--- Your code goes here
+neg-stable : ∀ {A : Set} → ¬ A → Stable A
+neg-stable f g = absurd (g f)
+
+conj-stable : ∀ {A B : Set} → Stable A × Stable B → Stable (A × B)
+conj-stable (sa , sb) ¬¬a×b = sa (λ{ ¬a → ¬¬a×b λ{ (a , _) → ¬a a } }) , sb (λ ¬b → ¬¬a×b (λ{ (_ , b) → ¬b b}))
 ```
 
 ## Standard Prelude

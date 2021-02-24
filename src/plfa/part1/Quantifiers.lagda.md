@@ -16,12 +16,18 @@ This chapter introduces universal and existential quantification.
 
 ```
 import Relation.Binary.PropositionalEquality as Eq
-open Eq using (_≡_; refl)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
+open Eq using (_≡_; refl; sym; cong)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties
 open import Relation.Nullary using (¬_)
 open import Data.Product using (_×_; proj₁; proj₂) renaming (_,_ to ⟨_,_⟩)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import plfa.part1.Isomorphism using (_≃_; extensionality)
+open import plfa.part1.Induction hiding (+-comm; +-assoc) renaming (from to from-bin; to to to-bin)
+open import plfa.part1.Relations using (One; Can; can-to)
+open import Function
+--open Eq.≡-Reasoning
+--open ≤-Reasoning
 ```
 
 
@@ -91,10 +97,25 @@ dependent product is ambiguous.
 #### Exercise `∀-distrib-×` (recommended)
 
 Show that universals distribute over conjunction:
+η-× : ∀ {A B : Set} (w : A × B) → ⟨ proj₁ w , proj₂ w ⟩ ≡ w
+η-× ⟨ x , y ⟩ = refl
 ```
+
+product-η : {A : Set} {B C : A → Set} {f : (x : A) → B x × C x} → (a : A) → ⟨ proj₁ (f a) , proj₂ (f a) ⟩ ≡ f a
+product-η a = refl
+
 postulate
-  ∀-distrib-× : ∀ {A : Set} {B C : A → Set} →
+  dep-extensionality : {A : Set} {B : A → Set} {f g : (x : A) → B x} → (∀ x → f x ≡ g x) → f ≡ g
+
+∀-distrib-× : ∀ {A : Set} {B C : A → Set} →
     (∀ (x : A) → B x × C x) ≃ (∀ (x : A) → B x) × (∀ (x : A) → C x)
+∀-distrib-× =
+  record
+    { from    = λ{ ⟨ B , C ⟩ a → ⟨ B a , C a ⟩ }
+    ; to      = λ{ f → ⟨ proj₁ ∘ f , proj₂ ∘ f ⟩ }
+    ; from∘to = λ f → refl -- dep-extensionality product-η
+    ; to∘from = λ{ ⟨ fst , snd ⟩ → refl }
+    }
 ```
 Compare this with the result (`→-distrib-×`) in
 Chapter [Connectives](/Connectives/).
@@ -103,12 +124,26 @@ Chapter [Connectives](/Connectives/).
 
 Show that a disjunction of universals implies a universal of disjunctions:
 ```
-postulate
-  ⊎∀-implies-∀⊎ : ∀ {A : Set} {B C : A → Set} →
+⊎∀-implies-∀⊎ : ∀ {A : Set} {B C : A → Set} →
     (∀ (x : A) → B x) ⊎ (∀ (x : A) → C x)  →  ∀ (x : A) → B x ⊎ C x
+⊎∀-implies-∀⊎ (inj₁ f) = inj₁ ∘ f
+⊎∀-implies-∀⊎ (inj₂ g) = inj₂ ∘ g
 ```
 Does the converse hold? If so, prove; if not, explain why.
 
+```
+```
+∀⊎-implies-⊎∀ : ∀ {A : Set} {B C : A → Set} →
+     (∀ (x : A) → B x ⊎ C x) → (∀ (x : A) → B x) ⊎ (∀ (x : A) → C x) 
+∀⊎-implies-⊎∀ f =
+  inj₁ (λ a → case f a of λ
+    { (inj₁ Bx) → Bx
+    ; (inj₂ Cx) → {!!}
+
+    })
+
+counter : ∀ {A : Set} → {B C : A → Set} → Σ (A B C) (∀ {x : A} → B x ⊎ C x) × ¬ ((∀ {x : A} → B x) ⊎ (∀ {x : A} → C x))
+counter = ?
 
 #### Exercise `∀-×` (practice)
 
@@ -118,6 +153,15 @@ data Tri : Set where
   aa : Tri
   bb : Tri
   cc : Tri
+
+tri-iso : ∀ {B : Tri → Set} → (∀ (x : Tri) → B x) ≃ B aa × B bb × B cc
+tri-iso =
+  record
+    { from    = λ{ ⟨ fst , snd ⟩ → λ{ aa → fst ; bb → proj₁ snd ; cc → proj₂ snd }}
+    ; to      = λ{ f → ⟨ f aa , ⟨ f bb , f cc ⟩ ⟩}
+    ; from∘to = λ{ f → dep-extensionality λ{ aa → refl ; bb → refl ; cc → refl } }
+    ; to∘from = λ{ ⟨ fst , ⟨ fst₁ , snd ⟩ ⟩ → refl }
+    }
 ```
 Let `B` be a type indexed by `Tri`, that is `B : Tri → Set`.
 Show that `∀ (x : Tri) → B x` is isomorphic to `B aa × B bb × B cc`.
@@ -248,25 +292,46 @@ establish the isomorphism is identical to what we wrote when discussing
 
 Show that existentials distribute over disjunction:
 ```
-postulate
-  ∃-distrib-⊎ : ∀ {A : Set} {B C : A → Set} →
-    ∃[ x ] (B x ⊎ C x) ≃ (∃[ x ] B x) ⊎ (∃[ x ] C x)
+
+∃-distrib-⊎ : ∀ {A : Set} {B C : A → Set} → ∃[ x ] (B x ⊎ C x) ≃ (∃[ x ] B x) ⊎ (∃[ x ] C x)
+∃-distrib-⊎ =
+  record
+    { to      = λ{ ⟨ a , inj₁ Ba ⟩ → inj₁ ⟨ a , Ba ⟩ ; ⟨ a , inj₂ Ca ⟩ → inj₂ ⟨ a , Ca ⟩ }
+    ; from    = λ{ (inj₁ ⟨ x , Bx ⟩) → ⟨ x , inj₁ Bx ⟩ ; (inj₂ ⟨ x , Cx ⟩) → ⟨ x , inj₂ Cx ⟩ }
+    ; from∘to = λ{ ⟨ x , inj₁ x₁ ⟩ → refl ; ⟨ x , inj₂ y ⟩ → refl }
+    ; to∘from = λ{ (inj₁ ⟨ x , x₁ ⟩) → refl ; (inj₂ ⟨ x , x₁ ⟩) → refl }
+    }
+
 ```
 
 #### Exercise `∃×-implies-×∃` (practice)
 
 Show that an existential of conjunctions implies a conjunction of existentials:
 ```
-postulate
-  ∃×-implies-×∃ : ∀ {A : Set} {B C : A → Set} →
-    ∃[ x ] (B x × C x) → (∃[ x ] B x) × (∃[ x ] C x)
+
+∃×-implies-×∃ : ∀ {A : Set} {B C : A → Set} → ∃[ x ] (B x × C x) → (∃[ x ] B x) × (∃[ x ] C x)
+∃×-implies-×∃ ⟨ x , ⟨ fst , snd ⟩ ⟩ = ⟨ ⟨ x , fst ⟩ , ⟨ x , snd ⟩ ⟩
+
 ```
+×∃-impliex-∃× : ∀ {A : Set} {B C : A → Set} → (∃[ x ] B x) × (∃[ x ] C x) → ∃[ x ] (B x × C x)
+×∃-impliex-∃× ⟨ ⟨ x , Bx ⟩ , ⟨ y , Cy ⟩ ⟩ = ⟨ y ,  ⟨ {!!} , Cy ⟩ ⟩
 Does the converse hold? If so, prove; if not, explain why.
 
 #### Exercise `∃-⊎` (practice)
 
 Let `Tri` and `B` be as in Exercise `∀-×`.
 Show that `∃[ x ] B x` is isomorphic to `B aa ⊎ B bb ⊎ B cc`.
+
+```
+∃-iso-⊎ : ∀ {B : Tri → Set} → ∃[ x ] B x ≃ B aa ⊎ B bb ⊎ B cc
+∃-iso-⊎ =
+  record
+    { from    = λ{ (inj₁ x) → ⟨ aa , x ⟩ ; (inj₂ (inj₁ x)) → ⟨ bb , x ⟩ ; (inj₂ (inj₂ y)) → ⟨ cc , y ⟩ }
+    ; to      = λ{ ⟨ aa , Bx ⟩ → inj₁ Bx ; ⟨ bb , Bx ⟩ → inj₂ (inj₁ Bx) ; ⟨ cc , Bx ⟩ → inj₂ (inj₂ Bx) }
+    ; from∘to = λ{ ⟨ aa , Bx ⟩ → refl ; ⟨ bb , Bx ⟩ → refl ; ⟨ cc , Bx ⟩ → refl }
+    ; to∘from = λ{ (inj₁ x) → refl ; (inj₂ (inj₁ x)) → refl ; (inj₂ (inj₂ y)) → refl }
+    }
+```
 
 
 ## An existential example
@@ -376,17 +441,68 @@ How do the proofs become more difficult if we replace `m * 2` and `1 + m * 2`
 by `2 * m` and `2 * m + 1`?  Rewrite the proofs of `∃-even` and `∃-odd` when
 restated in this way.
 
-```
--- Your code goes here
-```
+data Σ (A : Set) (B : A → Set) : Set where
+  ⟨_,_⟩ : (x : A) → B x → Σ A B
 
+∃ : ∀ {A : Set} (B : A → Set) → Set
+∃ {A} B = Σ A B
+```
+1+⇒suc : ∀ (n : ℕ) → n + 1 ≡ suc n
+1+⇒suc zero = refl
+1+⇒suc (suc n) = cong suc (1+⇒suc n)
+
+mutual
+  ∃-even-curry : ∀ {n : ℕ} → (m : ℕ) → 2 * m ≡ n → even n
+  ∃-even-curry zero refl = even-zero
+  ∃-even-curry (suc m) refl rewrite (sym (1+⇒suc (m + zero))) | sym (+-assoc m (m + 0) 1) = even-suc (∃-odd-curry m refl)
+
+  ∃-odd-curry : ∀ {n : ℕ} → (m : ℕ) → 2 * m + 1 ≡ n → odd n
+  ∃-odd-curry m refl rewrite (1+⇒suc (m + (m + 0))) = odd-suc (∃-even-curry m refl)
+
+∃-even' : ∀ {n : ℕ} → ∃[ m ] (2 *     m ≡ n) → even n
+∃-even' = (_≃_.to ∀∃-currying) ∃-even-curry
+
+∃-odd'  : ∀ {n : ℕ} → ∃[ m ] (2 * m + 1 ≡ n) →  odd n
+∃-odd' = (_≃_.to ∀∃-currying) ∃-odd-curry
+
+
+```
+∀∃-currying : ∀ {A : Set} {B : A → Set} {C : Set}
+  → (∀ x → B x → C) ≃ (∃[ x ] B x → C)
+
+∃ : ∀ {A : Set} (B : A → Set) → Set
+∃ {A} B = Σ A B
+
+∃-syntax = ∃
+syntax ∃-syntax (λ x → B) = ∃[ x ] B
+
+Goal: odd (x + (x + zero) + 1)
 #### Exercise `∃-|-≤` (practice)
 
 Show that `y ≤ z` holds if and only if there exists a `x` such that
 `x + y ≡ z`.
 
+≤-step : ∀ {m n} → m ≤ n → m ≤ 1 + n
 ```
--- Your code goes here
+
+∃-|-≤ : ∀ {y z : ℕ} → ∃[ x ] (x + y ≡ z) → y ≤ z
+∃-|-≤ {y} ⟨ zero , refl ⟩ = ≤-refl
+∃-|-≤  {y} ⟨ suc x , refl ⟩ =
+  begin
+    y
+  ≡⟨ +-comm zero y ⟩
+    y + zero
+  ≤⟨ +-monoʳ-≤ y {x = zero} {y = x} z≤n ⟩
+    y + x
+  ≡⟨ +-comm y x ⟩
+    x + y
+  ≤⟨ ≤-step ≤-refl ⟩
+    suc x + y
+  ≡⟨ refl ⟩
+    suc (x + y)
+  ∎
+  where
+    open ≤-Reasoning
 ```
 
 
@@ -402,10 +518,10 @@ of a disjunction is isomorphic to a conjunction of negations:
   → (¬ ∃[ x ] B x) ≃ ∀ x → ¬ B x
 ¬∃≃∀¬ =
   record
-    { to      =  λ{ ¬∃xy x y → ¬∃xy ⟨ x , y ⟩ }
-    ; from    =  λ{ ∀¬xy ⟨ x , y ⟩ → ∀¬xy x y }
-    ; from∘to =  λ{ ¬∃xy → extensionality λ{ ⟨ x , y ⟩ → refl } }
-    ; to∘from =  λ{ ∀¬xy → refl }
+    { to      = λ{ ¬∃xy → λ x y → ¬∃xy ⟨ x , y ⟩}
+    ; from    = λ{ ∀¬xy ⟨ x , Bx ⟩ → ∀¬xy x Bx}  
+    ; from∘to = λ{ ¬∃xy → extensionality λ{ ⟨ x , Bx ⟩ → refl } } 
+    ; to∘from = λ{ ∀¬xy → refl }
     }
 ```
 In the `to` direction, we are given a value `¬∃xy` of type
@@ -429,12 +545,13 @@ requires extensionality.
 
 Show that existential of a negation implies negation of a universal:
 ```
-postulate
-  ∃¬-implies-¬∀ : ∀ {A : Set} {B : A → Set}
-    → ∃[ x ] (¬ B x)
-      --------------
-    → ¬ (∀ x → B x)
+
+∃¬-implies-¬∀ : ∀ {A : Set} {B : A → Set} → ∃[ x ] (¬ B x) → ¬ (∀ x → B x)
+∃¬-implies-¬∀ ⟨ x , ¬Bx ⟩ = λ f → ¬Bx (f x)
+
 ```
+¬∀-implies-∃¬ : ∀ {A : Set} {B : A → Set} → (∀ x → B x) → ∃[ x ] (¬ B x)
+¬∀-implies-∃¬ f = ⟨ {!!} , {!!} ⟩
 Does the converse hold? If so, prove; if not, explain why.
 
 
@@ -480,9 +597,44 @@ which is a corollary of `≡Can`.
     proj₁≡→Can≡ : {cb cb′ : ∃[ b ](Can b)} → proj₁ cb ≡ proj₁ cb′ → cb ≡ cb′
 
 ```
--- Your code goes here
+≡One : ∀{b : Bin} (o o' : One b) → o ≡ o'
+≡One One.⟨⟩i One.⟨⟩i = refl
+≡One (o One.i) (o' One.i) = sym (cong One._i (≡One o' o))
+≡One (o One.o) (o' One.o) = sym (cong One._o (≡One o' o))
+
+
+≡Can : ∀{b : Bin} (cb : Can b) (cb' : Can b) → cb ≡ cb'
+≡Can {⟨⟩} (Can.nz x) (Can.nz x₁) = cong Can.nz (≡One x x₁) 
+≡Can {.⟨⟩ O} Can.z Can.z = refl
+≡Can {.⟨⟩ O} Can.z (Can.nz (() One.o))
+≡Can {.⟨⟩ O} (Can.nz (() One.o)) Can.z
+≡Can {b O} (Can.nz x) (Can.nz x₁) = cong Can.nz (≡One x x₁) 
+≡Can {b I} (Can.nz x) (Can.nz x₁) = cong Can.nz (≡One x x₁) 
+  
+--lemma : ∀ {n : ℕ} {x : Bin} { Cx : Can (to-bin n)} → ⟨ to-bin (from-bin x) , can-to n ⟩ ≡ ⟨ x , Cx ⟩
+--lemma =
+--  begin
+--    {!!}
+--  ≡⟨ {!!} ⟩
+--    {!!}
+--  ∎
+--  where
+--    open Eq.≡-Reasoning
+
+ℕ-≃-∃[b]Can-b : ℕ ≃ ∃[ b ] (Can b)
+ℕ-≃-∃[b]Can-b =
+  record
+    { from    = λ{ ⟨ x , Cx ⟩ → from-bin x }
+    ; to      = λ{ x → ⟨ to-bin x , can-to {x} ⟩ }
+    ; from∘to = λ{ zero → refl ; (suc x) → from∘to (suc x) }
+    ; to∘from = λ{ ⟨ x , Cx ⟩ → {!!} }
+    }
 ```
 
+Goal: ⟨ to-bin (from-bin x) , can-to ⟩ ≡ ⟨ x , Cx ⟩
+
+from∘to : ∀ (n : ℕ) → from (to n) ≡ n
+from∘inc : ∀ (b : Bin) → from (inc b) ≡ suc (from b)
 
 ## Standard library
 
@@ -498,4 +650,4 @@ This chapter uses the following unicode:
 
     Π  U+03A0  GREEK CAPITAL LETTER PI (\Pi)
     Σ  U+03A3  GREEK CAPITAL LETTER SIGMA (\Sigma)
-    ∃  U+2203  THERE EXISTS (\ex, \exists)
+
